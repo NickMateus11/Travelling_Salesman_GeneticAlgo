@@ -13,6 +13,7 @@ BLACK = pygame.Color("black")
 WHITE = pygame.Color("white")
 GREY = pygame.Color("grey")
 PINK = pygame.Color("magenta")
+GREEN = pygame.Color("green")
 
 
 def dist(route:np.ndarray, return_longest_segment=False):
@@ -123,9 +124,18 @@ def natural_selection(pop:list, _fitnesses:list, prune_candidate, do_crossover:b
     return children
 
 
+def closest_town(point, towns):
+    point = np.array(point)
+    closest_town = towns[0]
+    for town in towns:
+        if np.linalg.norm(point-town) < np.linalg.norm(point-closest_town):
+            closest_town = town
+    return closest_town
+
+
 def main():
 
-    num_towns = 15
+    num_towns = 50
     pop_size = 100
     towns = [np.array((randint(w//10,9*w//10),randint(h//10,9*h//10))) for _ in range(num_towns)]
     population = create_random_orders(towns, pop_size)
@@ -136,19 +146,50 @@ def main():
 
     iterations = 0
     iteration_thresh = num_towns**2
-
+    
+    time_start = time.time()
+    points = []
     running = True
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
-                towns = [np.array((randint(w//10,9*w//10),randint(h//10,9*h//10))) for _ in range(num_towns)]
-                population = create_random_orders(towns, pop_size)
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                closest = closest_town(pygame.mouse.get_pos(), towns)
+                if not reduce(lambda a,b: a or b,[np.array_equal(closest, town) for town in points], False):
+                    points.append(closest_town(pygame.mouse.get_pos(), towns))
+        
+        screen.fill(BLACK)
+        for point in towns:
+            pygame.draw.circle(screen, WHITE, point, 5, 2)
+        if len(points)>1:
+            pygame.draw.lines(screen, WHITE, False, points)
+        if len(points)>0:
+            pygame.draw.circle(screen, GREEN, points[-1], 5, 2)
+        
+        if len(points) == num_towns:
+            running = False
 
-                results = evaluate_routes(population)
-                best_ever_d = results["best_gen_d"]
-                best_ever_route = results["best_gen_route"]
+        results = evaluate_routes(population)
+        population = natural_selection(population, results["fitness_list"], results["prune_candidate"], True)
+        if results["best_gen_d"] < best_ever_d:
+            best_ever_d = results["best_gen_d"]
+            best_ever_route = results["best_gen_route"]
+        
+        pygame.display.flip()
+
+    time_end = time.time()
+    elapsed_time = time_end-time_start
+    distance = dist(points)
+
+    population.append(points)
+
+    start_time = time.time()
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
         
         screen.fill(BLACK)
 
@@ -158,7 +199,7 @@ def main():
         results = evaluate_routes(population)
         pygame.draw.lines(screen, GREY, False, population[-2], width=1)
 
-        population = natural_selection(population, results["fitness_list"], results["prune_candidate"], iterations<iteration_thresh)
+        population = natural_selection(population, results["fitness_list"], results["prune_candidate"], False)
         iterations+=1
 
         if results["best_gen_d"] < best_ever_d:
@@ -169,6 +210,14 @@ def main():
         pygame.display.flip()
         # time.sleep(1/30)
 
+        if time.time()-start_time > elapsed_time:
+            running = False
+
+    print(distance, best_ever_d)
+    if distance <= best_ever_d:
+        print("YOU WIN")
+    else:
+        print("YOU LOSE")
 
 if __name__ == "__main__":
     main()

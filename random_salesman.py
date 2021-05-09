@@ -19,7 +19,7 @@ def dist(a):
 
 def main():
 
-    num_towns = 8
+    num_towns = 20
     towns = [(randint(w//10,9*w//10),randint(h//10,9*h//10)) for _ in range(num_towns)]
     best = [dist(towns), towns]
 
@@ -44,7 +44,7 @@ def main():
         pygame.draw.lines(screen, PINK, False, best[1], width=3)
 
         pygame.display.flip()
-        # time.sleep(1/30)
+        time.sleep(1)
 
 
 if __name__ == "__main__":

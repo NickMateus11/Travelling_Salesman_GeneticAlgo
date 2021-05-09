@@ -21,7 +21,7 @@ def dist(a):
 
 def main():
 
-    num_towns = 5
+    num_towns = 10
     towns = [np.array((randint(w//10,9*w//10),randint(h//10,9*h//10))) for _ in range(num_towns)]
     best = [dist(towns), towns]
     perm_towns = permutations(towns) # generator
