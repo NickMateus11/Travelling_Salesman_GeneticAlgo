@@ -86,8 +86,7 @@ def mutate(genes):
     genes = genes[:]
     for i in range(len(genes)-1):
         if random() < mutation_rate:
-            j = randint(0, len(genes)-1)
-            genes[i], genes[j] = genes[j], genes[i]
+            genes[i], genes[i+1] = genes[i+1], genes[i]
     return genes
 
 
