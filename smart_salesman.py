@@ -16,25 +16,39 @@ PINK = pygame.Color("magenta")
 GREEN = pygame.Color("green")
 
 
+def dist(a,b):
+    return np.linalg.norm(np.array(a)-np.array(b))
+
 def reverse_segment(arr, start, end):
     return arr[:start] + arr[start:end+1:][::-1] + arr[end+1:]
 
 
-def dist(route:np.ndarray):
+def route_dist(route:np.ndarray):
     total = 0
     for i in range(len(route)-1):
-        d = np.linalg.norm(route[i]-route[i+1])
+        d = dist(route[i],route[i+1])
         total += d
     return total
 
 
+def closest_town(curr, towns):
+    min_d = dist(curr, towns[0])
+    index = 0
+    for i,t in enumerate(towns):
+        d = dist(curr, t)
+        if d < min_d:
+            min_d = d
+            index = i
+    return min_d, index
+
+
 def evaluate_routes(pop:list):
-    best_d = dist(pop[0])
+    best_d = route_dist(pop[0])
     best_route = pop[0]
     fitnesses = []
     for i in range(1,len(pop)):
         route = pop[i]
-        d = dist(route)
+        d = route_dist(route)
         fitnesses.append(d)
         if d < best_d:
             best_d = d
@@ -57,52 +71,29 @@ def create_random_orders(a:list, n:int):
     return random_routes
 
 
-def cross_over(parent1:list, parent2:list):
-    first_half = randint(0,1)
-    chop = randint(0,len(parent1))
-    if first_half:
-        child = parent1[:chop]
-    else:
-        child = parent1[-chop:]
-
-    for gene in parent2:
-        insert=True
-        for town in child:
-            if np.array_equal(gene, town):
-                insert = False
-                break
-        if insert:
-            child.append(gene)
-
-    return child
-
-
 def mutate(genes):
-    mutation_rate = 1/len(genes)
+    mutation_rate = 0.1
     for i in range(len(genes)-1):
         if random() < mutation_rate:
-            # genes[i], genes[i+1] = genes[i+1], genes[i]
-            j = randint(i+1,len(genes)-1)
-            genes = reverse_segment(genes, i, j)
-            # genes = prune(genes, i)
+            genes = prune(genes, i)
     return genes
 
 
-# def prune(genes, i=None):
-#     if i is None:
-#         i = randint(0,len(genes)-1)
-#     j = randint(i+1,len(genes)-1)
-#     min_d = dist(genes)
-#     min_g = genes
+def prune(genes, i=None):
+    if i is None:
+        i = randint(0,len(genes)-1)
+    j = randint(i+1,len(genes)-1)
+    min_d = route_dist(genes)
+    min_g = genes
 
-#     # while j < len(genes):
-#     g = reverse_segment(genes,i,j)
-#     d = dist(g)
-#     if d < min_d:
-#         min_d = d
-#         min_g = g 
-#         # j+=1
-#     return min_g
+    while j < len(genes):
+        g = reverse_segment(genes,i,j)
+        d = route_dist(g)
+        if d < min_d:
+            min_d = d
+            min_g = g 
+        j+=1
+    return min_g
 
 
 def natural_selection(pop:list, _fitnesses:list, do_crossover:bool=True, ):
@@ -116,24 +107,16 @@ def natural_selection(pop:list, _fitnesses:list, do_crossover:bool=True, ):
 
     children = []
     for _ in range(len(pop)-1):
-        p1 = pool[randint(0,pool_size-1)]
-        if do_crossover:
-            p2 = pool[randint(0,pool_size-1)]
-            genes = cross_over(p1,p2)
-        else:
-            genes = p1
-        genes = mutate(genes)
-        children.append(genes)
+        children.append(mutate(pool[randint(0,pool_size-1)]))
     children.append(pop[_fitnesses.index(max_fitness)])
-    # children.append(prune(pop[_fitnesses.index(max_fitness)]))
 
     return children
 
 
 def main():
 
-    num_towns = 10
-    pop_size = 2*num_towns
+    num_towns = 50
+    pop_size = 10
     towns = [np.array((randint(w//10,9*w//10),randint(h//10,9*h//10))) for _ in range(num_towns)]
     population = create_random_orders(towns, pop_size)
 
@@ -141,8 +124,43 @@ def main():
     best_ever_d = results["best_gen_d"]
     best_ever_route = results["best_gen_route"]
 
-    iterations = 0
-    iteration_thresh = num_towns**2
+    for _ in range(max(num_towns//2,10)):
+        iteration = randint(0,num_towns-1)
+        screen.fill(BLACK)
+
+        for point in towns:
+            pygame.draw.circle(screen, WHITE, point, 5, 2)
+        
+        towns_left = towns[:]
+        route = []
+
+        route.append(towns[iteration])
+        towns_left.pop(iteration)
+        route_d = 0
+        curr_town = towns[iteration]
+        while len(towns_left) > 0:
+            d, i = closest_town(curr_town, towns_left)
+            route_d += d
+            curr_town = towns_left[i]
+            route.append(towns_left[i])
+            towns_left.pop(i)
+
+            screen.fill(BLACK)
+            pygame.draw.lines(screen, GREY, False, route, width=2)
+            for point in towns:
+                pygame.draw.circle(screen, WHITE, point, 5, 2)
+            pygame.draw.circle(screen, GREEN, towns[iteration], 5, 2)
+            pygame.display.flip()
+            time.sleep(1/(num_towns/2)**2)
+
+        if route_d < best_ever_d:
+            best_ever_d = route_d
+            best_ever_route = route
+    
+        pygame.display.flip()
+
+    population[-1] = best_ever_route
+
 
     running = True
     while running:
@@ -166,7 +184,6 @@ def main():
         pygame.draw.lines(screen, GREY, False, population[-2], width=1)
 
         population = natural_selection(population, results["fitness_list"], False)
-        iterations+=1
 
         if results["best_gen_d"] < best_ever_d:
             best_ever_d = results["best_gen_d"]
@@ -174,7 +191,7 @@ def main():
         pygame.draw.lines(screen, PINK, False, best_ever_route, width=3)
 
         pygame.display.flip()
-        time.sleep(1/30)
+        # time.sleep(1/30)
 
 
 if __name__ == "__main__":
