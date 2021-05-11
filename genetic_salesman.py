@@ -13,51 +13,48 @@ BLACK = pygame.Color("black")
 WHITE = pygame.Color("white")
 GREY = pygame.Color("grey")
 PINK = pygame.Color("magenta")
+GREEN = pygame.Color("green")
 
 
-def dist(route:np.ndarray, return_longest_segment=False):
+def reverse_segment(arr, start, end):
+    return arr[:start] + arr[start:end+1:][::-1] + arr[end+1:]
+
+
+def dist(route:np.ndarray):
     total = 0
-    longest_segment = None
-    longest_segment_index = None
     for i in range(len(route)-1):
         d = np.linalg.norm(route[i]-route[i+1])
-        if not longest_segment or d > longest_segment:
-            longest_segment = d
-            longest_segment_index = i
         total += d
-    if return_longest_segment:
-        return total, longest_segment_index
     return total
 
 
 def evaluate_routes(pop:list):
-    best_d, prune_candidate = dist(pop[0], True)
+    best_d = dist(pop[0])
     best_route = pop[0]
     fitnesses = []
     for i in range(1,len(pop)):
         route = pop[i]
-        d, pc = dist(route, True)
+        d = dist(route)
         fitnesses.append(d)
         if d < best_d:
             best_d = d
             best_route = route
-            prune_candidate = pc
     return {
         "fitness_list":fitnesses, 
         "best_gen_d":best_d, 
         "best_gen_route":best_route,
-        "prune_candidate":prune_candidate
     }
 
 
 def create_random_orders(a:list, n:int):
-    random_orders = []
+    random_routes = []
     for i in range(n):
         temp = a[:]
-        random_orders.append([])
+        random_route = []
         while len(temp)>0:
-            random_orders[i].append(temp.pop(randint(0,len(temp)-1)))
-    return random_orders
+            random_route.append(temp.pop(randint(0,len(temp)-1)))
+        random_routes.append(random_route)
+    return random_routes
 
 
 def cross_over(parent1:list, parent2:list):
@@ -67,7 +64,6 @@ def cross_over(parent1:list, parent2:list):
         child = parent1[:chop]
     else:
         child = parent1[-chop:]
-
 
     for gene in parent2:
         insert=True
@@ -86,18 +82,29 @@ def mutate(genes):
     genes = genes[:]
     for i in range(len(genes)-1):
         if random() < mutation_rate:
-            genes[i], genes[i+1] = genes[i+1], genes[i]
+            # genes[i], genes[i+1] = genes[i+1], genes[i]
+            genes = prune(genes, i)
     return genes
 
 
-def prune(genes, i):
+def prune(genes, i=None):
+    if i is None:
+        i = randint(0,len(genes)-1)
     j = randint(0,len(genes)-1)
-    genes = genes[:]
-    genes[i], genes[j] = genes[j], genes[i]
-    return genes
+    min_d = dist(genes)
+    min_g = genes
+
+    while j < len(genes):
+        g = reverse_segment(genes,i,j)
+        d = dist(g)
+        if d < min_d:
+            min_d = d
+            min_g = g 
+        j+=1
+    return min_g
 
 
-def natural_selection(pop:list, _fitnesses:list, prune_candidate, do_crossover:bool=True, ):
+def natural_selection(pop:list, _fitnesses:list, do_crossover:bool=True, ):
     max_fitness = min(_fitnesses)
     fitnesses = 1 / (np.array(_fitnesses) / max_fitness)
 
@@ -107,7 +114,7 @@ def natural_selection(pop:list, _fitnesses:list, prune_candidate, do_crossover:b
     pool_size = len(pool)
 
     children = []
-    for _ in range(len(pop)-2):
+    for _ in range(len(pop)-1):
         p1 = pool[randint(0,pool_size-1)]
         if do_crossover:
             p2 = pool[randint(0,pool_size-1)]
@@ -117,15 +124,15 @@ def natural_selection(pop:list, _fitnesses:list, prune_candidate, do_crossover:b
         genes = mutate(genes)
         children.append(genes)
     children.append(pop[_fitnesses.index(max_fitness)])
-    children.append(prune(pop[_fitnesses.index(max_fitness)], prune_candidate))
+    # children.append(prune(pop[_fitnesses.index(max_fitness)]))
 
     return children
 
 
 def main():
 
-    num_towns = 15
-    pop_size = 100
+    num_towns = 20
+    pop_size = 20
     towns = [np.array((randint(w//10,9*w//10),randint(h//10,9*h//10))) for _ in range(num_towns)]
     population = create_random_orders(towns, pop_size)
 
@@ -157,7 +164,7 @@ def main():
         results = evaluate_routes(population)
         pygame.draw.lines(screen, GREY, False, population[-2], width=1)
 
-        population = natural_selection(population, results["fitness_list"], results["prune_candidate"], iterations<iteration_thresh)
+        population = natural_selection(population, results["fitness_list"], False)
         iterations+=1
 
         if results["best_gen_d"] < best_ever_d:

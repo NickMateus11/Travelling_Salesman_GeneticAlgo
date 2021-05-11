@@ -6,6 +6,7 @@ import time
 import numpy as np
 from Held_Karp import held_karp as tsp
 
+
 w, h = 800, 600
 pygame.init()
 screen = pygame.display.set_mode((w, h))
@@ -43,33 +44,6 @@ def main():
     num_towns = 15
     towns = [np.array((randint(w//10,9*w//10),randint(h//10,9*h//10))) for _ in range(num_towns)]
 
-    time_start = time.time()
-    points = []
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                closest = closest_town(pygame.mouse.get_pos(), towns)
-                if not reduce(lambda a,b: a or b,[np.array_equal(closest, town) for town in points], False):
-                    points.append(closest_town(pygame.mouse.get_pos(), towns))
-        
-        screen.fill(BLACK)
-        for point in towns:
-            pygame.draw.circle(screen, WHITE, point, 5, 2)
-        if len(points)>1:
-            pygame.draw.lines(screen, WHITE, False, points)
-        if len(points)>0:
-            pygame.draw.circle(screen, GREEN, points[-1], 5, 2)
-        
-        if len(points) == num_towns:
-            running = False
-
-        pygame.display.flip()
-
-    distance = tour_dist(points)
-
     dist = create_dist_matrix(towns)
     d, town_i = tsp(dist)
     temp = town_i[:]
@@ -83,12 +57,6 @@ def main():
     tour = []
     for i in town_i:
         tour.append(towns[i])
-
-    print(distance, d)
-    if distance <= d:
-        print("YOU WIN")
-    else:
-        print("YOU LOSE")
 
     running = True
     while running:
@@ -105,7 +73,7 @@ def main():
         pygame.draw.lines(screen, PINK, False, tour, width=3)
 
         pygame.display.flip()
-        # time.sleep(1/30)
+        time.sleep(1/30)
 
 if __name__ == "__main__":
     main()
